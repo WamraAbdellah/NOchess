@@ -1,0 +1,21 @@
+const express = require('express');
+
+module.exports = function(pool) {
+  const router = express.Router();
+
+  router.get('/:username', async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT id, username, rating, games_played, games_won, games_lost, games_drawn, created_at
+         FROM users WHERE username = $1`,
+        [req.params.username]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+      res.json(result.rows[0]);
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  return router;
+};
