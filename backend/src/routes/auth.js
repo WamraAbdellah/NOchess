@@ -42,7 +42,13 @@ module.exports = function(pool) {
         { expiresIn: '7d' }
       );
 
-      res.status(201).json({ token, user: { id: user.id, username: user.username, email: user.email, rating: user.rating } });
+      res.status(201).json({ token, user: {
+        id: user.id, username: user.username, email: user.email,
+        rating: user.rating,
+        rating_bullet: user.rating_bullet,
+        rating_blitz: user.rating_blitz,
+        rating_rapid: user.rating_rapid
+      } });
     } catch (err) {
       console.error('Register error:', err);
       res.status(500).json({ error: 'Server error' });
@@ -82,10 +88,11 @@ module.exports = function(pool) {
       res.json({
         token,
         user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
+          id: user.id, username: user.username, email: user.email,
           rating: user.rating,
+          rating_bullet: user.rating_bullet,
+          rating_blitz: user.rating_blitz,
+          rating_rapid: user.rating_rapid,
           gamesPlayed: user.games_played,
           gamesWon: user.games_won
         }
@@ -104,7 +111,10 @@ module.exports = function(pool) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
       const result = await pool.query(
-        'SELECT id, username, email, rating, games_played, games_won, games_lost, games_drawn, created_at FROM users WHERE id = $1',
+        `SELECT id, username, email, rating, rating_bullet, rating_blitz, rating_rapid,
+                games_played, games_won, games_lost, games_drawn,
+                bullet_played, blitz_played, rapid_played, created_at
+         FROM users WHERE id = $1`,
         [decoded.userId]
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });

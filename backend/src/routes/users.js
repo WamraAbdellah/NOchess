@@ -6,7 +6,9 @@ module.exports = function(pool) {
   router.get('/:username', async (req, res) => {
     try {
       const result = await pool.query(
-        `SELECT id, username, rating, games_played, games_won, games_lost, games_drawn, created_at
+        `SELECT id, username, rating, rating_bullet, rating_blitz, rating_rapid,
+                games_played, games_won, games_lost, games_drawn,
+                bullet_played, blitz_played, rapid_played, created_at
          FROM users WHERE username = $1`,
         [req.params.username]
       );

@@ -206,7 +206,8 @@ export default function GamePage() {
                 <div style={{ color: '#c9a14a', fontSize: 13, fontWeight: 600 }}>{getResultText()}</div>
                 {myRatingDelta !== null && (
                   <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                    Elo: <span style={{ color: myRatingDelta >= 0 ? '#4caf50' : '#e74c3c', fontWeight: 700 }}>
+                    {ratingChange.category ? `${ratingChange.category} ` : ''}Elo:{' '}
+                    <span style={{ color: myRatingDelta >= 0 ? '#4caf50' : '#e74c3c', fontWeight: 700 }}>
                       {myRatingDelta >= 0 ? '+' : ''}{myRatingDelta}
                     </span>
                   </div>

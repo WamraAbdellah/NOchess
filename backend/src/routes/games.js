@@ -17,11 +17,16 @@ module.exports = function(pool, redisClient) {
   // Leaderboard — must be before /:id
   router.get('/leaderboard/top', async (req, res) => {
     try {
+      const category = req.query.category || 'rapid'; // bullet | blitz | rapid
+      const validCols = { bullet: 'rating_bullet', blitz: 'rating_blitz', rapid: 'rating_rapid' };
+      const col = validCols[category] || 'rating_rapid';
+      const playedCol = { bullet: 'bullet_played', blitz: 'blitz_played', rapid: 'rapid_played' }[category] || 'rapid_played';
+
       const result = await pool.query(`
-        SELECT username, rating, games_played, games_won, games_lost, games_drawn
+        SELECT username, ${col} as rating, ${playedCol} as games_played, games_won
         FROM users
-        WHERE games_played > 0
-        ORDER BY rating DESC
+        WHERE ${playedCol} > 0
+        ORDER BY ${col} DESC
         LIMIT 20
       `);
       res.json(result.rows);

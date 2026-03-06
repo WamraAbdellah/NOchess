@@ -2,6 +2,7 @@
 
 const { parseFEN, makeMove, applyMove, getGameStatus, getAllLegalMoves, getMoveNotation, INITIAL_FEN, COLOR, idxToSquare } = require('../chess/engine');
 const { getBotMove, BOT_LEVELS } = require('../chess/bot');
+const { getCategory, ratingColumns } = require('../chess/timeControl');
 const { v4: uuidv4 } = require('uuid');
 
 const waitingQueues = {};
@@ -106,6 +107,10 @@ module.exports = function setupSocketHandlers(io, pool, redisClient) {
       if (winnerColor === 'w') { wR = 1; bR = 0; }
       else if (winnerColor === 'b') { wR = 0; bR = 1; }
 
+      // Determine category and which rating column to update
+      const category = getCategory(game.time_control || 600);
+      const cols = ratingColumns(category);
+
       const wRating = game.white_rating || 1200;
       const bRating = game.black_rating || 1200;
       const wDelta = calcElo(wRating, bRating, wR);
@@ -113,26 +118,29 @@ module.exports = function setupSocketHandlers(io, pool, redisClient) {
 
       try {
         await pool.query(`UPDATE users SET
-          rating = GREATEST(100, rating + $1),
+          ${cols.rating} = GREATEST(100, ${cols.rating} + $1),
+          ${cols.played} = ${cols.played} + 1,
           games_played = games_played + 1,
-          games_won = games_won + $2,
+          games_won  = games_won  + $2,
           games_lost = games_lost + $3,
-          games_drawn = games_drawn + $4
+          games_drawn= games_drawn+ $4
           WHERE id = $5`,
           [wDelta, wR===1?1:0, wR===0?1:0, wR===0.5?1:0, wId]);
 
         await pool.query(`UPDATE users SET
-          rating = GREATEST(100, rating + $1),
+          ${cols.rating} = GREATEST(100, ${cols.rating} + $1),
+          ${cols.played} = ${cols.played} + 1,
           games_played = games_played + 1,
-          games_won = games_won + $2,
+          games_won  = games_won  + $2,
           games_lost = games_lost + $3,
-          games_drawn = games_drawn + $4
+          games_drawn= games_drawn+ $4
           WHERE id = $5`,
           [bDelta, bR===1?1:0, bR===0?1:0, bR===0.5?1:0, bId]);
 
-        console.log(`📊 ELO updated: white ${wRating}${wDelta>=0?'+':''}${wDelta} | black ${bRating}${bDelta>=0?'+':''}${bDelta}`);
+        console.log(`📊 ELO [${category}] white ${wRating}${wDelta>=0?'+':''}${wDelta} | black ${bRating}${bDelta>=0?'+':''}${bDelta}`);
 
         io.to(gameId).emit('game:ratingChange', {
+          category,
           white: { change: wDelta, newRating: wRating + wDelta },
           black: { change: bDelta, newRating: bRating + bDelta }
         });
@@ -223,8 +231,10 @@ module.exports = function setupSocketHandlers(io, pool, redisClient) {
         const [ws, bs] = Math.random() > 0.5 ? [socket, oppSocket] : [oppSocket, socket];
 
         let wR = 1200, bR = 1200;
-        if (!ws.isGuest) { try { const r = await pool.query('SELECT rating FROM users WHERE id=$1', [ws.userId]); if(r.rows[0]) wR=r.rows[0].rating; } catch(e){} }
-        if (!bs.isGuest) { try { const r = await pool.query('SELECT rating FROM users WHERE id=$1', [bs.userId]); if(r.rows[0]) bR=r.rows[0].rating; } catch(e){} }
+        const cat = getCategory(timeControl);
+        const rcols = ratingColumns(cat);
+        if (!ws.isGuest) { try { const r = await pool.query(`SELECT ${rcols.rating} as rating FROM users WHERE id=$1`, [ws.userId]); if(r.rows[0]) wR=r.rows[0].rating; } catch(e){} }
+        if (!bs.isGuest) { try { const r = await pool.query(`SELECT ${rcols.rating} as rating FROM users WHERE id=$1`, [bs.userId]); if(r.rows[0]) bR=r.rows[0].rating; } catch(e){} }
 
         const gs = {
           id: gameId,

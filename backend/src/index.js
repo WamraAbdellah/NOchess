@@ -92,13 +92,27 @@ async function initDB() {
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
         rating INTEGER DEFAULT 1200,
+        rating_bullet INTEGER DEFAULT 1200,
+        rating_blitz INTEGER DEFAULT 1200,
+        rating_rapid INTEGER DEFAULT 1200,
         games_played INTEGER DEFAULT 0,
         games_won INTEGER DEFAULT 0,
         games_lost INTEGER DEFAULT 0,
         games_drawn INTEGER DEFAULT 0,
+        bullet_played INTEGER DEFAULT 0,
+        blitz_played INTEGER DEFAULT 0,
+        rapid_played INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW(),
         last_seen TIMESTAMP DEFAULT NOW()
       );
+
+      -- Migration: add new columns if they don't exist yet (safe for existing DB)
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS rating_bullet INTEGER DEFAULT 1200;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS rating_blitz  INTEGER DEFAULT 1200;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS rating_rapid  INTEGER DEFAULT 1200;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS bullet_played INTEGER DEFAULT 0;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS blitz_played  INTEGER DEFAULT 0;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS rapid_played  INTEGER DEFAULT 0;
 
       CREATE TABLE IF NOT EXISTS games (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

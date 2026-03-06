@@ -5,7 +5,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('nochess_token'));
+  const [token, setToken] = useState(sessionStorage.getItem('nochess_token'));
 
   useEffect(() => {
     if (token) {
@@ -42,7 +42,7 @@ export function AuthProvider({ children }) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Login failed');
     
-    localStorage.setItem('nochess_token', data.token);
+    sessionStorage.setItem('nochess_token', data.token);
     setToken(data.token);
     setUser(data.user);
     return data;
@@ -57,14 +57,14 @@ export function AuthProvider({ children }) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Registration failed');
     
-    localStorage.setItem('nochess_token', data.token);
+    sessionStorage.setItem('nochess_token', data.token);
     setToken(data.token);
     setUser(data.user);
     return data;
   }
 
   function logout() {
-    localStorage.removeItem('nochess_token');
+    sessionStorage.removeItem('nochess_token');
     setToken(null);
     setUser(null);
   }
