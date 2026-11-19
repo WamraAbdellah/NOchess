@@ -5,6 +5,8 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const redis = require('redis');
+const helmet = require('helmet');
+const { JWT_SECRET, JWT_VERIFY_OPTIONS } = require('./config');
 
 const authRoutes = require('./routes/auth');
 const gameRoutes = require('./routes/games');
@@ -15,6 +17,7 @@ const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
+  maxHttpBufferSize: 16 * 1024, // no legitimate event is anywhere near this big
   cors: {
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     methods: ['GET', 'POST'],
@@ -35,11 +38,14 @@ const redisClient = redis.createClient({
 redisClient.connect().catch(console.error);
 
 // Middleware
+app.set('trust proxy', 1); // behind nginx: use the client IP it forwards (for rate limiting)
+app.disable('x-powered-by');
+app.use(helmet({ frameguard: { action: 'deny' } }));
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10kb' }));
 
 // Auth middleware for socket
 io.use((socket, next) => {
@@ -52,7 +58,7 @@ io.use((socket, next) => {
     return next();
   }
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'nochess_secret_key');
+    const decoded = jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTIONS);
     socket.userId = decoded.userId;
     socket.username = decoded.username;
     socket.isGuest = false;
@@ -72,6 +78,18 @@ app.use('/api/users', userRoutes(pool));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'NOchess API' }));
+
+// Malformed JSON bodies etc. — answer cleanly without leaking stack traces
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) console.error('Unhandled error:', err);
+  res.status(status).json({ error: status >= 500 ? 'Server error' : 'Bad request' });
+});
+
+// Last line of defence: a stray rejected promise is logged instead of killing
+// every live game. (Socket handlers are also individually wrapped.)
+process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 
 // Socket handlers
 setupSocketHandlers(io, pool, redisClient);
