@@ -9,15 +9,15 @@ services:
     container_name: nochess_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: nochess
-      POSTGRES_USER: nochess
-      POSTGRES_PASSWORD: nochess_password
+      POSTGRES_DB: ${POSTGRES_DB:-nochess}
+      POSTGRES_USER: ${POSTGRES_USER:-nochess}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # No "ports:" on purpose: the database is only reachable from inside the
+    # Docker network, never from the internet.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nochess"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,13 +31,14 @@ services:
     image: redis:7-alpine
     container_name: nochess_redis
     restart: unless-stopped
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env (see .env.example)}
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --maxmemory 256mb --maxmemory-policy allkeys-lru"]
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
+    # No "ports:" on purpose: Redis is internal only.
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,17 +57,17 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://nochess:nochess_password@postgres:5432/nochess
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-nochess_super_secret_jwt_key_change_in_production}
-      FRONTEND_URL: http://localhost
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nochess}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nochess}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (see .env.example)}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "3001:3001"
+    # No "ports:" on purpose: all traffic goes through nginx, which applies
+    # rate limits and security headers.
     networks:
       - nochess_network
     healthcheck:
